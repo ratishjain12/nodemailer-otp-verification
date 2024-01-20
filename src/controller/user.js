@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
 const handleSignUp = async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) {
-    return res.json({ error: "Please Enter All Details" });
+    throw new Error("Please enter all user details");
   }
   const user = await User.findOne({ email });
   if (user) {
@@ -51,7 +51,7 @@ const handleSignUp = async (req, res) => {
 
 const handleOTPVerifcation = async (req, res) => {
   const { otp, userId } = req.body;
-
+  if (!otp || !userId) throw new Error("Please enter all user details");
   const pendingUser = await Otpverification.findOne({ userId: userId });
 
   if (!pendingUser) {
@@ -71,7 +71,17 @@ const handleOTPVerifcation = async (req, res) => {
   }
 };
 
-const handleOTPResend = async (req, res) => {};
+const handleOTPResend = async (req, res) => {
+  const { userId, email } = req.body;
+  if (!userId || !email) throw new Error("Please enter all user details");
+  try {
+    await Otpverification.deleteMany({ userId });
+    sendOTPVerificationEmail(userId, email);
+    return res.json({ status: "Otp sent!" });
+  } catch (err) {
+    return res.json({ error: err.message });
+  }
+};
 
 const sendOTPVerificationEmail = async ({ _id, email }, res) => {
   const otp = otpgen();
