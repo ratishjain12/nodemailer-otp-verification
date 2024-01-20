@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
   auth: {
     // TODO: replace `user` and `pass` values from <https://forwardemail.net>
     user: process.env.USER_EMAIL,
-    pass: "hwsz cqfm hydh omzn",
+    pass: process.env.USER_PASS,
   },
 });
 
@@ -48,7 +48,29 @@ const handleSignUp = async (req, res) => {
       .catch((err) => console.error(err.message));
   }
 };
-const handleOTPVerifcation = async (req, res) => {};
+
+const handleOTPVerifcation = async (req, res) => {
+  const { otp, userId } = req.body;
+
+  const pendingUser = await Otpverification.findOne({ userId: userId });
+
+  if (!pendingUser) {
+    return res.json({ status: "User is already verified" });
+  }
+  if (Date.now() > pendingUser.expiresAt) {
+    return res.json({ status: "Otp is expired" });
+  }
+
+  const isSame = await bcrypt.compare(otp, pendingUser.otp);
+  if (isSame) {
+    await Otpverification.deleteOne({ userId: pendingUser.userId });
+    await User.updateOne({ _id: userId }, { verified: true });
+    res.json({ status: "User verified successfully" });
+  } else {
+    res.json({ status: "Please Enter Correct OTP!!" });
+  }
+};
+
 const handleOTPResend = async (req, res) => {};
 
 const sendOTPVerificationEmail = async ({ _id, email }, res) => {
@@ -68,10 +90,16 @@ const sendOTPVerificationEmail = async ({ _id, email }, res) => {
       userId: _id,
       otp: hashOTP.toString(),
       createdAt: Date.now(),
-      expiresAt: Date.now() + 60000,
+      expiresAt: Date.now() + 600000,
     });
 
-    await transporter.sendMail(mailOptions);
+    transporter.sendMail(mailOptions, (err, data) => {
+      if (err) {
+        console.log("Error Occurs");
+      } else {
+        console.log("Email sent successfully");
+      }
+    });
     res.json({ status: "pending", message: "Otp is not verified!!" });
   } catch (err) {
     res.json({ status: "error", message: err.message });
